@@ -1,0 +1,127 @@
+Dataguard steps: 
+
+Startup Shutdown:
+
+startup nomount; --startup database
+alter database mount standby database; -- mount in standby mode
+
+----------------------------------------------------------------------------------------------------------------------------------------
+SELECT  PROCESS, STATUS,THREAD#, SEQUENCE#,BLOCK#,BLOCKS, DELAY_MINS FROM  V$MANAGED_STANDBY;
+
+PROCESS   STATUS	SEQUENCE#     BLOCK#	 BLOCKS DELAY_MINS
+--------- ------------ ---------- ---------- ---------- ----------
+ARCH	  CONNECTED		0	   0	      0 	 0
+ARCH	  CONNECTED		0	   0	      0 	 0
+ARCH	  CONNECTED		0	   0	      0 	 0
+ARCH	  CONNECTED		0	   0	      0 	 0
+-----------------------------------------------------------------------------------------------------------------------------------------
+
+alter database recover managed standby database disconnect from session; 
+
+--This statement starts a detached server process and immediately returns control to the user. While the managed recovery process is performing recovery in the background, the foreground process that issued the RECOVER statement can continue performing other tasks. This does not disconnect the current SQL session.
+
+After 10 mins you can find a process getting started for appling 
+
+select inst_id, process, status, thread#, sequence#, block#, blocks from gv$managed_standby where process in ('RFS','LNS','MRP0');
+
+
+SELECT  PROCESS, STATUS,SEQUENCE#,BLOCK#,BLOCKS, DELAY_MINS FROM  V$MANAGED_STANDBY;
+
+PROCESS   STATUS	SEQUENCE#     BLOCK#	 BLOCKS DELAY_MINS
+--------- ------------ ---------- ---------- ---------- ----------
+ARCH	  CONNECTED		0	   0	      0 	 0
+ARCH	  CONNECTED		0	   0	      0 	 0
+ARCH	  CONNECTED		0	   0	      0 	 0
+ARCH	  CONNECTED		0	   0	      0 	 0
+MRP0	  APPLYING_LOG	     9924    1335905	4194304 	 0
+
+
+SQL> SELECT  PROCESS, STATUS,SEQUENCE#,BLOCK#,BLOCKS, DELAY_MINS FROM  V$MANAGED_STANDBY;
+
+PROCESS   STATUS	SEQUENCE#     BLOCK#	 BLOCKS DELAY_MINS
+--------- ------------ ---------- ---------- ---------- ----------
+ARCH	  CLOSING	    10353    3702784	   1561 	 0
+ARCH	  CONNECTED		0	   0	      0 	 0
+ARCH	  CLOSING	     9922    3303424	    524 	 0
+ARCH	  CLOSING	     9923    3702784	    450 	 0
+RFS	  IDLE			0	   0	      0 	 0
+RFS	  IDLE		     9924      61780	     22 	 0
+RFS	  IDLE			0	   0	      0 	 0
+RFS	  IDLE			0	   0	      0 	 0
+RFS	  IDLE			0	   0	      0 	 0
+RFS	  IDLE		    10355    1601314	      2 	 0
+RFS	  IDLE			0	   0	      0 	 0
+
+
+SQL> select PROCESS,CLIENT_PROCESS,THREAD#,SEQUENCE#,BLOCK# from v$managed_standby where process = 'MRP0' or client_process='LGWR';
+
+PROCESS   CLIENT_P    THREAD#  SEQUENCE#     BLOCK#
+--------- -------- ---------- ---------- ----------
+RFS       LGWR              1      28495       8010
+MRP0      N/A               1      28495       8010
+
+
+
+
+SQL> select max(sequence#)  from v$archived_log where applied='YES' and THREAD#=1;
+
+MAX(SEQUENCE#)
+--------------
+	 10354
+
+SQL> select max(sequence#)  from v$archived_log where applied='YES' and THREAD#=2;
+
+MAX(SEQUENCE#)
+--------------
+	  9921
+	  
+SQL> !
+ps -fe|grep mrp
+
+
+SQL> SELECT MESSAGE FROM V$DATAGUARD_STATUS;
+
+
+SQL> select distinct THREAD# from v$archived_log;
+
+   THREAD#
+----------
+	 1
+	 2
+***** Alternate commands to start the archive log application processes ********************************************
+
+Start a foreground session, control is not returned to the command prompt until recovery is canceled by another session
+
+ALTER DATABASE RECOVER MANAGED STANDBY DATABASE;
+
+To start real time apply - applies current log from the source instance
+
+ALTER DATABASE RECOVER MANAGED STANDBY DATABASE USING CURRENT LOGFILE;
+
+
+Specifying time delay for log application:
+
+You can set a time delay on primary and standby databases using the DELAY=minutes attribute of the LOG_ARCHIVE_DEST_n initialization parameter to delay applying archived redo log files to the standby database. By default, there is no time delay. If you specify the DELAY attribute without specifying a value, then the default delay interval is 30 minutes.
+
+To cancel the time delay:
+ALTER DATABASE RECOVER MANAGED STANDBY DATABASE NODELAY;
+
+*************************************************************************************************************************
+Shutdown the DR database:
+
+ALTER DATABASE RECOVER MANAGED STANDBY DATABASE CANCEL; - cancel the redo log apply
+
+shut immediate;
+
+==============================================================================================================================================================
+
+Setup information
+-----------------
+
+Source instance:
+
+Log_archive_config - dg_config=(naerpprd,naerpprd_stby)
+log_archive_dest_1 - location=USE_DB_RECOVERY_FILE_DEST -- Source database archive log location
+log_archive_dest_2 - service="naerpprd_dup_stby", ASYNC NOAFFIRM delay=0 optional compression=disable max_failure=0 max_connections=1 reopen=300 db_unique_name="naerpprd_stby" net_timeout=30, valid_for=(online_logfile,all_roles)
+
+
