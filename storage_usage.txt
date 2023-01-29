@@ -1,0 +1,78 @@
+select distinct vt.name,  to_char(CREATION_TIME, 'MON-YY'), sum(bytes)/1024/1024/1024 from v$datafile vd, v$tablespace vt where vd.ts# = vt.ts# group by vt.name, to_char(CREATION_TIME, 'MON-YY');
+
+select count(*) from v$datafile;
+
+desc dba_segments;
+
+select
+   fs.tablespace_name                          "Tablespace",
+   (df.totalspace - fs.freespace)/1024              "Used GB",
+   fs.freespace/1024                                "Free GB",
+   df.totalspace/1024                               "Total GB",
+   round(100 * (fs.freespace / df.totalspace)) "Pct. Free"
+from
+   (select
+      tablespace_name,
+      round(sum(bytes) / 1048576) TotalSpace
+   from
+      dba_data_files
+   group by
+      tablespace_name
+   ) df,
+   (select
+      tablespace_name,
+      round(sum(bytes) / 1048576) FreeSpace
+   from
+      dba_free_space
+   group by
+      tablespace_name
+   ) fs
+where
+   df.tablespace_name = fs.tablespace_name;
+   
+
+SELECT owner, segment_name, segment_type, partition_name, ROUND(bytes/(1024*1024),2) SIZE_MB, tablespace_name 
+FROM DBA_SEGMENTS 
+WHERE SEGMENT_TYPE IN ('TABLE', 'TABLE PARTITION', 'TABLE SUBPARTITION', 
+'INDEX', 'INDEX PARTITION', 'INDEX SUBPARTITION', 'TEMPORARY', 'LOBINDEX', 'LOBSEGMENT', 'LOB PARTITION')
+AND TABLESPACE_NAME LIKE 'APPS_TS_TX_DATA' 
+--AND SEGMENT_NAME LIKE 'WF_NOTIFICATIONS' 
+--AND partition_name LIKE 'P20100201%'
+--AND segment_type = 'TABLE'
+--AND OWNER = 'TARGET_POC' 
+--AND ROUND(bytes/(1024*1024),2) > 1000 
+ORDER BY bytes DESC;
+
+
+SELECT
+   owner, 
+   table_name, 
+   TRUNC(sum(bytes)/1024/1024/1024) GB,
+   ROUND( ratio_to_report( sum(bytes) ) over () * 100) Percent
+FROM
+(SELECT segment_name table_name, owner, bytes
+ FROM dba_segments
+ WHERE segment_type IN ('TABLE', 'TABLE PARTITION', 'TABLE SUBPARTITION')
+ UNION ALL
+ SELECT i.table_name, i.owner, s.bytes
+ FROM dba_indexes i, dba_segments s
+ WHERE s.segment_name = i.index_name
+ AND   s.owner = i.owner
+ AND   s.segment_type IN ('INDEX', 'INDEX PARTITION', 'INDEX SUBPARTITION')
+ UNION ALL
+ SELECT l.table_name, l.owner, s.bytes
+ FROM dba_lobs l, dba_segments s
+ WHERE s.segment_name = l.segment_name
+ AND   s.owner = l.owner
+ AND   s.segment_type IN ('LOBSEGMENT', 'LOB PARTITION')
+ UNION ALL
+ SELECT l.table_name, l.owner, s.bytes
+ FROM dba_lobs l, dba_segments s
+ WHERE s.segment_name = l.index_name
+ AND   s.owner = l.owner
+ AND   s.segment_type = 'LOBINDEX')
+WHERE owner in UPPER('&owner')
+GROUP BY table_name, owner
+HAVING SUM(bytes)/1024/1024 > 10  /* Ignore really small tables */
+ORDER BY SUM(bytes) desc
+;
