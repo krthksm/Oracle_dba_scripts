@@ -2,7 +2,7 @@ select distinct vt.name,  to_char(CREATION_TIME, 'MON-YY'), sum(bytes)/1024/1024
 
 select count(*) from v$datafile;
 
-desc dba_segments;
+desc dba_segments;  ### To find the absolute value of the content inside the datafile
 
 select
    fs.tablespace_name                          "Tablespace",
