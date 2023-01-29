@@ -19,10 +19,3 @@ begin
 end;
 /
 
-
--javaagent:/u01/appdynamics/java-agent-bpa/javaagent.jar -Dappdynamics.agent.tierName=clr_rfui_1 -Dappdynamics.agent.nodeName=b11l3v1256_clr_rfui_1
-
-
-APPD_ARGS="-javaagent:/u01/appdynamics/java-agent-bpa/javaagent.jar -Dappdynamics.agent.tierName=clr_rfui_1 -Dappdynamics.agent.nodeName=b11l3v1257_clr_rfui_1"
-APPD_ARGS="-javaagent:/u01/appdynamics/java-agent-bpa/javaagent.jar -Dappdynamics.agent.tierName=clr_rfui_2 -Dappdynamics.agent.nodeName=b11l3v1257_clr_rfui_2"
-APPD_ARGS="-javaagent:/u01/appdynamics/java-agent-bpa/javaagent.jar -Dappdynamics.agent.tierName=clr_rfui_3 -Dappdynamics.agent.nodeName=b11l3v1257_clr_rfui_3"
